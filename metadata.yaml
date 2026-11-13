@@ -1,0 +1,14 @@
+name: astrbot_plugin_qq_voice_text
+display_name: QQ语音转文字
+short_desc: 使用本地 Whisper 识别 QQ 语音，把语音替换成文字。
+desc: >-
+  收到 QQ 语音时，下载语音交给本地 Whisper worker 识别，再把语音消息替换成文字。
+  不依赖 QQ 原生转写、ffmpeg 或额外 API Key。
+version: 2.0.1
+author: local
+repo: https://github.com/Cheela-star/Cheela
+astrbot_version: ">=4.14.0"
+tags:
+  - 语音
+  - QQ
+  - SnowLuma

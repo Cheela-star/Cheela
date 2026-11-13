@@ -1,0 +1,50 @@
+{
+  "enabled": {
+    "description": "启用本地语音识别",
+    "type": "bool",
+    "default": true,
+    "hint": "收到语音时调用本地 Whisper worker，不再调用 QQ 原生转写。"
+  },
+  "worker_port": {
+    "description": "本地识别服务端口",
+    "type": "int",
+    "default": 18321,
+    "hint": "默认 18321；如果被占用可以改。"
+  },
+  "node_path": {
+    "description": "node.exe 路径",
+    "type": "string",
+    "default": "",
+    "hint": "留空会自动查找 PATH、D:\\SnowLuma\\node.exe 和 Program Files\\nodejs。"
+  },
+  "model_dir": {
+    "description": "Whisper 模型目录",
+    "type": "string",
+    "default": "",
+    "hint": "留空使用插件目录下 worker/models；也可以指向已有的 Xenova/whisper-base 模型目录。"
+  },
+  "max_seconds": {
+    "description": "最长语音秒数",
+    "type": "int",
+    "default": 120,
+    "hint": "超过这个长度的语音不做识别。"
+  },
+  "prefix": {
+    "description": "转写文字前缀",
+    "type": "string",
+    "default": "",
+    "hint": "会加在识别结果前面。"
+  },
+  "fallback_notice": {
+    "description": "识别失败时添加提示",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后失败会在消息里补一个“[语音识别失败]”提示。"
+  },
+  "show_error_detail": {
+    "description": "提示里显示详细报错",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后会把错误原因放进提示；日志始终记录详细报错。"
+  }
+}

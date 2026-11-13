@@ -1,0 +1,100 @@
+name: Publish QQ voice-to-text v2.0.1
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.github/workflows/publish-v2.0.1.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-qq-voice-v2.0.1
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download and verify original model files, then publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh auth setup-git
+          git clone --branch main "https://github.com/${GITHUB_REPOSITORY}.git" "$RUNNER_TEMP/plugin"
+          cd "$RUNNER_TEMP/plugin"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import time
+          import urllib.request
+          from pathlib import Path
+
+          prefix = 'worker/models/Xenova/whisper-base/'
+          manifest = json.loads(Path('model-checksums.json').read_text())
+          for name, expected in manifest.items():
+              path = Path(name)
+              assert name.startswith(prefix) and '..' not in path.parts, name
+              if path.exists() and hashlib.sha256(path.read_bytes()).hexdigest() == expected:
+                  continue
+              url = 'https://huggingface.co/Xenova/whisper-base/resolve/main/' + name[len(prefix):]
+              for attempt in range(3):
+                  try:
+                      with urllib.request.urlopen(url, timeout=120) as response:
+                          data = response.read()
+                      if hashlib.sha256(data).hexdigest() != expected:
+                          raise ValueError(f'Original archive checksum mismatch: {name}')
+                      path.parent.mkdir(parents=True, exist_ok=True)
+                      path.write_bytes(data)
+                      print(f'Verified {name}: {len(data)} bytes')
+                      break
+                  except Exception:
+                      if attempt == 2:
+                          raise
+                      time.sleep(5)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add worker/models/
+          if ! git diff --cached --quiet; then
+            git commit -m 'Include verified original Whisper model files'
+            git push origin HEAD:main
+          fi
+          if ! git rev-parse --verify refs/tags/v2.0.1 >/dev/null 2>&1; then
+            git tag v2.0.1
+            git push origin v2.0.1
+          fi
+          python3 - <<'PY'
+          import ast
+          import hashlib
+          import json
+          import os
+          import zipfile
+          from pathlib import Path
+
+          ast.parse(Path('main.py').read_text(encoding='utf-8'))
+          for path in Path('.').rglob('*.json'):
+              if '.git' not in path.parts:
+                  json.loads(path.read_text(encoding='utf-8'))
+          for name, expected in json.loads(Path('model-checksums.json').read_text()).items():
+              assert hashlib.sha256(Path(name).read_bytes()).hexdigest() == expected, name
+          output = Path(os.environ['RUNNER_TEMP']) / 'QQ-voice-to-text-v2.0.1.zip'
+          with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
+              for path in sorted(Path('.').rglob('*')):
+                  if not path.is_file() or any(part in {'.git', '.github', '__pycache__', 'node_modules'} for part in path.parts) or path.suffix == '.log':
+                      continue
+                  archive.write(path, 'astrbot_plugin_qq_voice_text/' + path.as_posix())
+          print(f'Package: {output.stat().st_size} bytes')
+          notes = Path(os.environ['RUNNER_TEMP']) / 'release-notes.md'
+          notes.write_text('QQ 语音转文字 v2.0.1（AstrBot 插件）。\n\n保留原包功能代码和本地 Whisper 模型；模型文件已逐项核对 SHA-256。补充中文安装说明、Python 依赖与第三方许可说明，移除运行日志。\n\n安装后仍需在 worker 目录执行 npm install，并为 AstrBot 的 Python 环境安装 requirements.txt。详见 README。\n\n已进行代码语法及文件完整性检查，尚未完成真实 QQ 环境中的端到端测试。\n', encoding='utf-8')
+          PY
+          node --check worker/server.mjs
+          if gh release view v2.0.1 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload v2.0.1 "$RUNNER_TEMP/QQ-voice-to-text-v2.0.1.zip" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create v2.0.1 "$RUNNER_TEMP/QQ-voice-to-text-v2.0.1.zip" --repo "$GITHUB_REPOSITORY" --verify-tag --title 'QQ语音转文字 v2.0.1' --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi
